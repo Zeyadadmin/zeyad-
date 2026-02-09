@@ -1,0 +1,269 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let adminEmails = [
+        'super@ymt.com', 
+        'content@ymt.com', 
+        'support@ymt.com', 
+        'Romanceloves497@gmail.com', 
+        'ziadahmedaliziad06@gmail.com', 
+        'ziadahmedaliziad106@gmail.com',
+        'ziadahmedali016@gmail.com'
+      ];
+      // Check email first as it doesn't require a DB read.
+      return (request.auth != null && request.auth.token.email in adminEmails) || 
+             (exists(userPath) && get(userPath).data.role == 'admin');
+    }
+    
+    function isDriver() {
+        let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+        return exists(userPath) && (get(userPath).data.role == 'driver' || get(userPath).data.role == 'delivery-driver');
+    }
+
+    // --- Rules for 'users' collection ---
+    match /users/{userId} {
+      allow read: if true;
+      allow list: if isAdmin();
+      // Allow user to create their own user document
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Allow admin to update anything.
+      // Allow user to update only a specific set of non-critical fields.
+      allow update: if (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'displayName_lowercase', 'photoURL', 'online', 'phone', 'city', 'specialty', 'workHours', 'vacationDays', 'location', 'companyName'])) || isAdmin();
+      allow delete: if isAdmin();
+      
+      // --- Rules for 'comments' subcollection ---
+      match /comments/{commentId} {
+        allow read: if true; 
+        allow create: if isSignedIn() 
+                      && request.resource.data.userId == request.auth.uid 
+                      && request.resource.data.serviceProviderId == userId;
+        allow update, delete: if false;
+      }
+      
+      // --- Rules for 'products' subcollection ---
+      match /products/{productId} {
+        allow read: if true;
+        allow write: if isOwner(userId) || isAdmin();
+
+        // Rules for comments on a specific product/property
+        match /comments/{commentId} {
+            allow read: if true;
+            allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+            allow update, delete: if false;
+        }
+      }
+       
+      // --- Rules for 'flights' and 'visas' subcollections (for agencies) ---
+      match /flights/{flightId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
+
+      match /visas/{visaId} {
+          allow read: if true;
+          allow write: if isOwner(userId);
+      }
+       // --- Rules for 'orders' subcollection ---
+      match /orders/{orderId} {
+          allow read: if isOwner(userId) || isAdmin();
+          allow create: if isOwner(userId) || isAdmin();
+          // Allow customer to update status to 'completed' or 'cancelled'.
+          // Allow provider to update status to 'delivered'.
+          allow update: if (isOwner(userId) && (request.resource.data.status == 'مكتمل' || request.resource.data.status == 'ملغي')) || 
+                        isAdmin() || (
+                            resource.data.providerId != null &&
+                            request.auth.uid == resource.data.providerId &&
+                            request.resource.data.status == 'تم التسليم' &&
+                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                        );
+      }
+      
+      // --- Rules for user's 'paymentMethods' subcollection ---
+      match /paymentMethods/{methodId} {
+          allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // --- Rules for 'subscriptionRequests' collection ---
+    match /subscriptionRequests/{requestId} {
+        allow get, delete: if isAdmin();
+        allow list: if isAdmin();
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        // Admins can update anything.
+        // Customer can update status to 'مكتمل'
+        allow update: if isAdmin() || (
+            resource.data.userId == request.auth.uid &&
+            request.resource.data.status == 'مكتمل' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        );
+    }
+    
+    // --- Rules for 'paymentMethods' collection ---
+    match /paymentMethods/{methodId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
+    
+    // --- Rules for 'calls' collection ---
+    match /calls/{callId} {
+        function isParticipant() {
+          let call = get(/databases/$(database)/documents/calls/$(callId));
+          return call != null && call.data != null && (request.auth.uid == call.data.callerId || request.auth.uid == call.data.calleeId);
+        }
+
+        allow read, create, update: if isSignedIn() && isParticipant();
+        allow delete: if isSignedIn() && (isOwner(resource.data.callerId) || isOwner(resource.data.calleeId));
+
+        match /offerCandidates/{candidateId} {
+            allow create: if isSignedIn() && isParticipant();
+            allow read, update, delete: if false;
+        }
+        match /answerCandidates/{candidateId} {
+            allow create: if isSignedIn() && isParticipant();
+            allow read, update, delete: if false;
+        }
+    }
+
+    // --- Rules for 'chats' collection ---
+    match /chats/{chatId} {
+      allow get, update: if isSignedIn() && request.auth.uid in resource.data.users;
+      allow list: if isSignedIn() && request.query.where.get('users').get('array_contains') == request.auth.uid;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.users;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
+    }
+    
+     // --- Rules for 'deliveryRequests' collection ---
+    match /deliveryRequests/{requestId} {
+        allow read: if true;
+        allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
+        // Allow requester to update/delete, or any signed-in user to accept the request.
+        allow update: if (isSignedIn() && resource.data.requesterId == request.auth.uid) || 
+                       (isSignedIn() && request.resource.data.status == 'in-progress' && request.resource.data.driverId == request.auth.uid);
+        allow delete: if isSignedIn() && resource.data.requesterId == request.auth.uid || isAdmin();
+    }
+    
+    // --- Rules for 'deliveryOffers' collection ---
+    match /deliveryOffers/{offerId} {
+      allow read: if true;
+      allow create: if isSignedIn() && (isDriver() || isAdmin());
+      allow update, delete: if (isSignedIn() && request.resource.data.driverId == request.auth.uid) || isAdmin();
+    }
+
+    // --- Rules for 'immediateRideRequests' collection ---
+    match /immediateRideRequests/{requestId} {
+        allow read: if isDriver() || (isSignedIn() && request.auth.uid == resource.data.requesterId);
+        allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
+        allow update: if (isDriver() && request.auth.uid == request.resource.data.driverId) || (isSignedIn() && request.auth.uid == resource.data.requesterId) || (isDriver() && request.resource.data.status == 'accepted');
+        allow delete: if (isSignedIn() && request.auth.uid == resource.data.requesterId) || isAdmin();
+    }
+
+    // --- Rules for 'scheduledTrips' collection ---
+    match /scheduledTrips/{tripId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isDriver() && request.resource.data.driverId == request.auth.uid;
+        allow update, delete: if isSignedIn() && resource.data.driverId == request.auth.uid || isAdmin();
+        
+        // --- Rules for comments on a specific trip ---
+        match /comments/{commentId} {
+            allow read: if true;
+            allow create: if isSignedIn() 
+                          && request.resource.data.userId == request.auth.uid
+                          && request.resource.data.serviceProviderId == tripId;
+            allow update, delete: if false;
+        }
+    }
+    
+    // --- Rules for 'ads' collection ---
+    match /ads/{adId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+
+    // --- Rules for 'bookings' collection ---
+    match /bookings/{bookingId} {
+        function isProvider() {
+            return request.auth.uid == resource.data.serviceProviderId;
+        }
+        function isCustomer() {
+            return request.auth.uid == resource.data.customerId;
+        }
+
+        allow read: if isSignedIn() && (isProvider() || isCustomer() || isAdmin());
+        allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
+        // Admin can update status from 'جديد' to 'مدفوع', or to 'مؤرشف'
+        // Provider can update status from 'مدفوع' to 'مؤكد' or 'ملغي'
+        // Customer can update status to 'مكتمل' (from 'مؤكد') or to 'ملغي' (from 'جديد' or 'مؤكد')
+        allow update: if (isAdmin() && (
+                          (request.resource.data.status == 'مدفوع' && resource.data.status == 'جديد') ||
+                          (request.resource.data.status == 'مؤرشف')
+                        )) ||
+                       (isProvider() && (
+                          (request.resource.data.status == 'مؤكد' || request.resource.data.status == 'ملغي') && resource.data.status == 'مدفوع'
+                       )) ||
+                       (isCustomer() && (
+                          (request.resource.data.status == 'مكتمل' && resource.data.status == 'مؤكد') ||
+                          (request.resource.data.status == 'ملغي' && (resource.data.status == 'جديد' || resource.data.status == 'مؤكد'))
+                       ));
+        allow delete: if isAdmin();
+    }
+
+    // --- Collection Group Rules for Search ---
+    match /{path=**}/products/{productId} {
+      allow read: if true;
+    }
+    match /{path=**}/scheduledTrips/{tripId} {
+      allow read: if true;
+    }
+     match /{path=**}/flights/{flightId} {
+      allow read: if true;
+    }
+     match /{path=**}/visas/{visaId} {
+      allow read: if true;
+    }
+    match /{path=**}/paymentMethods/{methodId} {
+      allow list: if isAdmin();
+    }
+
+
+    // Generic rule for comments on other top-level collections (e.g., trips, hotels)
+    match /{collection}/{docId} {
+        allow read: if true; 
+
+        match /comments/{commentId} {
+            allow read: if true;
+            allow create: if isSignedIn() 
+                          && request.resource.data.userId == request.auth.uid
+                          && request.resource.data.serviceProviderId == docId;
+            allow update, delete: if false;
+        }
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
+
+    
