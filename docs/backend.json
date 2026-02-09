@@ -1,1 +1,657 @@
 
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's profile in the system, containing both public and private information.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID from Firebase Auth."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's full display name."
+        },
+        "displayName_lowercase": {
+            "type": "string",
+            "description": "Lowercase version of the display name for case-insensitive search."
+        },
+        "photoURL": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the user's profile picture."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user in the application.",
+          "enum": ["passenger", "driver", "merchant", "admin", "hotel", "agency", "real-estate-agent", "contractor", "doctor", "salon", "restaurant", "delivery-driver", "heavy-equipment-owner"]
+        },
+        "status": {
+            "type": "string",
+            "description": "The verification status of the user account.",
+            "enum": ["معتمد", "محظور", "قيد المراجعة"],
+            "default": "قيد المراجعة"
+        },
+        "subscription": {
+            "type": "string",
+            "description": "The user's subscription plan.",
+            "enum": ["برو", "مجانية"],
+            "default": "مجانية"
+        },
+        "pinned": {
+            "type": "boolean",
+            "description": "Whether the user is pinned in admin views.",
+            "default": false
+        },
+        "online": {
+            "type": "boolean",
+            "description": "Indicates if the service provider is currently online and available.",
+            "default": false
+        },
+        "documentUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the verification document for service providers."
+        },
+        "location": {
+            "type": "object",
+            "properties": {
+                "latitude": { "type": "number" },
+                "longitude": { "type": "number" }
+            },
+            "description": "The user's last known geographic location (geopoint)."
+        },
+        "phone": { "type": "string" },
+        "city": { "type": "string" },
+        "companyName": { "type": "string" },
+        "specialty": { "type": "string" },
+        "workHours": { "type": "string" },
+        "vacationDays": { "type": "string" },
+        "referralCode": {
+          "type": "string",
+          "description": "The user's unique referral code for affiliate marketing."
+        },
+        "referredBy": {
+          "type": "string",
+          "description": "The UID of the user who referred this user."
+        },
+        "referralEarnings": {
+          "type": "number",
+          "description": "Total earnings from referrals.",
+          "default": 0
+        }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "UserPaymentMethod": {
+      "title": "User Payment Method",
+      "description": "Represents a user-defined payment method, like a bank account or mobile wallet.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The type of the payment method (e.g., 'Bank Account', 'Mobile Wallet')."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the bank or wallet provider (e.g., 'CAC Bank', 'M-Floos')."
+        },
+        "accountIdentifier": {
+          "type": "string",
+          "description": "The account number or phone number associated with the method."
+        }
+      },
+      "required": ["type", "name", "accountIdentifier"]
+    },
+    "Property": {
+        "title": "Real Estate Property",
+        "description": "Represents a single real estate property listing, stored under a user's products subcollection.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string", "description": "The title of the property listing." },
+            "description": { "type": "string" },
+            "price": { "type": "string" },
+            "imageUrls": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" },
+              "description": "A list of image URLs for the property, with the first one being the primary."
+            },
+            "ownerId": { "type": "string", "description": "The UID of the agent who owns this property." },
+            "ownerRole": { "type": "string", "enum": ["real-estate-agent"] },
+            "city": { "type": "string" },
+            "pinned": { "type": "boolean", "default": false }
+        },
+        "required": ["name", "price", "ownerId", "ownerRole"]
+    },
+    "Product": {
+        "title": "Product or Service",
+        "description": "Represents a product, service, or offer provided by a user. Can also be a property.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "name_lowercase": { "type": "string", "description": "Lowercase version of the product name for case-insensitive search." },
+            "description": { "type": "string" },
+            "price": { "type": "string" },
+            "imageUrls": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" },
+              "description": "A list of image URLs for the product, with the first one being the primary."
+            },
+            "videoUrl": { "type": "string", "format": "uri" },
+            "status": { "type": "string", "enum": ["متوفر", "غير متوفر", "محظور"], "default": "متوفر" },
+            "ownerId": { "type": "string" },
+            "ownerName": { "type": "string", "description": "Denormalized display name of the product owner." },
+            "ownerPhotoURL": { "type": "string", "format": "uri", "description": "Denormalized photo URL of the product owner." },
+            "ownerRole": { "type": "string" },
+            "city": { "type": "string" },
+            "sizes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Available sizes for the product."
+            },
+            "colors": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Available colors for the product."
+            }
+        },
+        "required": ["name", "price", "ownerId"]
+    },
+    "Flight": {
+      "title": "Flight Booking",
+      "description": "Represents a single flight offered by a travel agency.",
+      "type": "object",
+      "properties": {
+        "destination": { "type": "string" },
+        "airline": { "type": "string" },
+        "price": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "agencyId": { "type": "string" }
+      },
+      "required": ["destination", "airline", "price", "date", "agencyId"]
+    },
+    "Visa": {
+      "title": "Visa Service",
+      "description": "Represents a visa service offered by a travel agency.",
+      "type": "object",
+      "properties": {
+        "country": { "type": "string" },
+        "type": { "type": "string" },
+        "price": { "type": "string" },
+        "processingTime": { "type": "string" },
+        "agencyId": { "type": "string" }
+      },
+      "required": ["country", "type", "price", "agencyId"]
+    },
+    "SubscriptionRequest": {
+        "title": "Subscription Request",
+        "description": "Represents a user's request to subscribe to a paid plan or purchase a product.",
+        "type": "object",
+        "properties": {
+            "userId": { "type": "string" },
+            "userName": { "type": "string" },
+            "userAvatar": { "type": "string", "format": "uri" },
+            "plan": { "type": "string" },
+            "amount": { "type": "string" },
+            "paymentDetails": { "type": "string" },
+            "accountNumber": { "type": "string" },
+            "transactionId": { "type": "string" },
+            "createdAt": { "type": "object" },
+            "status": { "type": "string", "enum": ["بانتظار الدفع", "مدفوع", "قيد التوصيل", "تم التسليم", "مكتمل", "مؤرشف"] },
+            "merchantId": { "type": "string" },
+            "customerId": { "type": "string" },
+            "deliveryDriverId": { "type": "string" },
+            "items": {
+              "type": "array",
+              "description": "The items included in the order.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "quantity": { "type": "number" },
+                  "price": { "type": "number" },
+                  "size": { "type": "string" },
+                  "color": { "type": "string" }
+                }
+              }
+            }
+        },
+        "required": ["userId", "userName", "plan", "amount", "paymentDetails", "createdAt"]
+    },
+    "PaymentMethod": {
+        "title": "Payment Method",
+        "description": "Represents a payment method configured by the admin.",
+        "type": "object",
+        "properties": {
+            "name": { "type": "string" },
+            "instructions": { "type": "string" },
+            "accountNumber": { "type": "string" }
+        },
+        "required": ["name", "instructions"]
+    },
+    "Chat": {
+        "title": "Chat Room",
+        "description": "Represents a single chat conversation between users.",
+        "type": "object",
+        "properties": {
+            "users": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "An array of user UIDs participating in the chat."
+            },
+            "lastMessage": {
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string" },
+                    "timestamp": { "type": "string", "format": "date-time" }
+                }
+            },
+            "userInfo": {
+                "type": "object",
+                "patternProperties": {
+                    "^[a-zA-Z0-9_]+$": {
+                        "type": "object",
+                        "properties": {
+                            "displayName": { "type": "string" },
+                            "photoURL": { "type": "string", "format": "uri" }
+                        },
+                        "required": ["displayName"]
+                    }
+                },
+                "description": "An object containing display info for each user in the chat, keyed by UID."
+            }
+        },
+        "required": ["users", "userInfo"]
+    },
+    "Message": {
+        "title": "Chat Message",
+        "description": "Represents a single message within a chat room.",
+        "type": "object",
+        "properties": {
+            "senderId": { "type": "string" },
+            "text": { "type": "string" },
+            "imageUrl": { "type": "string", "format": "uri" },
+            "timestamp": { "type": "object" }
+        },
+        "required": ["senderId", "timestamp"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Represents a user comment or review on a service or provider.",
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The content of the comment."
+        },
+        "rating": {
+          "type": "number",
+          "description": "A star rating from 1 to 5.",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "userId": {
+          "type": "string",
+          "description": "The UID of the user who wrote the comment."
+        },
+        "userName": {
+            "type": "string",
+            "description": "The display name of the user who wrote the comment."
+        },
+        "userAvatar": {
+            "type": "string",
+            "format": "uri",
+            "description": "The avatar URL of the user who wrote the comment."
+        },
+        "serviceProviderId": {
+          "type": "string",
+          "description": "The UID or ID of the service provider or product being commented on."
+        },
+        "createdAt": {
+          "type": "object",
+          "description": "The timestamp when the comment was created."
+        }
+      },
+      "required": ["text", "rating", "userId", "serviceProviderId", "createdAt"]
+    },
+     "DeliveryRequest": {
+      "title": "Delivery Request",
+      "description": "A request for a delivery service.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A short title for the delivery request."
+        },
+        "city": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string",
+           "description": "The offered price for the delivery."
+        },
+        "pinned": {
+          "type": "boolean",
+          "default": false
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of item to be delivered.",
+           "enum": ["طرد", "طعام", "مستندات"]
+        },
+        "requesterId": {
+            "type": "string",
+            "description": "The UID of the user who created the request."
+        },
+        "driverId": {
+            "type": "string",
+            "description": "The UID of the driver who accepted the request."
+        },
+        "status": {
+            "type": "string",
+            "enum": ["new", "in-progress", "completed"],
+            "default": "new"
+        }
+      },
+       "required": ["name", "city", "requesterId", "type", "status"]
+    },
+    "DeliveryOffer": {
+      "title": "Delivery Offer",
+      "description": "An offer for a delivery service posted by a driver.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A short title for the delivery offer."
+        },
+        "destination": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "price": {
+          "type": "string"
+        },
+        "vehicle": {
+          "type": "string"
+        },
+        "driverId": {
+          "type": "string"
+        },
+        "driverName": {
+          "type": "string"
+        },
+        "driverAvatar": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["name", "destination", "date", "price", "driverId", "driverName"]
+    },
+    "RideRequest": {
+        "title": "Immediate Ride Request",
+        "description": "A request for an immediate ride from a passenger.",
+        "type": "object",
+        "properties": {
+            "requesterId": { "type": "string" },
+            "requesterName": { "type": "string" },
+            "requesterAvatar": { "type": "string", "format": "uri" },
+            "city": { "type": "string" },
+            "pickup": { "type": "string" },
+            "destination": { "type": "string" },
+            "status": { "type": "string", "enum": ["new", "accepted", "in-progress", "completed", "cancelled"], "default": "new" },
+            "createdAt": { "type": "object" },
+            "driverId": { "type": "string" }
+        },
+        "required": ["requesterId", "requesterName", "city", "pickup", "destination", "status", "createdAt"]
+    },
+    "UserOrder": {
+      "title": "User Order",
+      "description": "Represents an order made by a user from a merchant or provider.",
+      "type": "object",
+      "properties": {
+        "providerId": { "type": "string" },
+        "providerName": { "type": "string" },
+        "amount": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["بانتظار الدفع", "قيد التنفيذ", "قيد التوصيل", "تم التسليم", "مكتمل", "ملغي"]
+        },
+        "createdAt": { "type": "object" },
+        "deliveryDriverId": { "type": "string" }
+      },
+      "required": ["providerId", "providerName", "amount", "status", "createdAt"]
+    },
+    "Ad": {
+      "title": "Advertisement",
+      "description": "Represents a single advertisement banner or popup.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "link": { "type": "string", "format": "uri" },
+        "displayType": { "type": "string", "enum": ["carousel", "popup"], "default": "carousel" },
+        "type": { "type": "string", "enum": ["صورة", "فيديو"] },
+        "content": { "type": "string", "format": "uri" },
+        "placement": { "type": "string" },
+        "active": { "type": "boolean", "default": true }
+      },
+      "required": ["title", "displayType", "type", "content", "placement", "active"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Represents a booking made by a customer for a service.",
+      "type": "object",
+      "properties": {
+        "serviceProviderId": { "type": "string", "description": "The UID of the service provider." },
+        "customerId": { "type": "string", "description": "The UID of the customer making the booking." },
+        "customerName": { "type": "string" },
+        "customerAvatar": { "type": "string", "format": "uri" },
+        "serviceName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "amount": { "type": "string" },
+        "paymentInfo": {
+            "type": "object",
+            "properties": {
+                "method": { "type": "string" },
+                "transactionId": { "type": "string" }
+            }
+        },
+        "status": {
+            "type": "string",
+            "enum": ["جديد", "مؤكد", "ملغي", "بانتظار الدفع", "مدفوع", "مكتمل", "مؤرشف"],
+            "default": "جديد"
+        }
+      },
+      "required": ["serviceProviderId", "customerId", "customerName", "serviceName", "date", "status"]
+    },
+    "Call": {
+      "title": "Call",
+      "description": "Represents a WebRTC call for signaling.",
+      "type": "object",
+      "properties": {
+        "callerId": { "type": "string" },
+        "calleeId": { "type": "string" },
+        "callerName": { "type": "string" },
+        "callerAvatar": { "type": "string", "format": "uri" },
+        "isVideo": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["ringing", "answered", "declined"] }
+      }
+    },
+    "Trip": {
+      "title": "Scheduled Trip",
+      "description": "Represents a scheduled trip offered by a driver.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "destination": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "price": { "type": "string" },
+        "seats": { "type": "number" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "driverAvatar": { "type": "string", "format": "uri" }
+      },
+      "required": ["name", "destination", "date", "price", "seats", "driverId"]
+    }
+  },
+  "auth": {
+    "providers": ["email"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Stores public and private user profile information.",
+       "subcollections": {
+            "/comments/{commentId}": {
+                "schema": { "$ref": "#/entities/Comment" },
+                "description": "Contains all comments for a given user."
+            },
+            "/orders/{orderId}": {
+                "schema": { "$ref": "#/entities/UserOrder" },
+                "description": "Contains all orders made by this user."
+            },
+            "/products/{productId}": {
+                "schema": { "$ref": "#/entities/Product" },
+                "description": "Contains all products/services offered by this user. For real estate agents, this holds their properties.",
+                "subcollections": {
+                    "/comments/{commentId}": {
+                        "schema": { "$ref": "#/entities/Comment" },
+                        "description": "Comments specific to this product/property."
+                    }
+                }
+            },
+            "/flights/{flightId}": {
+                "schema": { "$ref": "#/entities/Flight" },
+                "description": "Contains all flights offered by this travel agency."
+            },
+            "/visas/{visaId}": {
+                "schema": { "$ref": "#/entities/Visa" },
+                "description": "Contains all visa services offered by this travel agency."
+            },
+             "/paymentMethods/{methodId}": {
+                "schema": { "$ref": "#/entities/UserPaymentMethod" },
+                "description": "Stores the user's personal payment methods."
+            }
+        }
+    },
+     "/subscriptionRequests/{requestId}": {
+        "schema": {
+            "$ref": "#/entities/SubscriptionRequest"
+        },
+        "description": "Stores user requests for plan subscriptions."
+    },
+    "/paymentMethods/{methodId}": {
+        "schema": {
+            "$ref": "#/entities/PaymentMethod"
+        },
+        "description": "Stores admin-configured payment methods for subscriptions."
+    },
+    "/chats/{chatId}": {
+        "schema": {
+            "$ref": "#/entities/Chat"
+        },
+        "description": "Stores metadata for each chat room.",
+        "subcollections": {
+            "/messages/{messageId}": {
+                "schema": {
+                    "$ref": "#/entities/Message"
+                },
+                "description": "Contains all messages for a given chat."
+            }
+        }
+    },
+    "/calls/{callId}": {
+      "schema": {
+        "$ref": "#/entities/Call"
+      },
+      "description": "Stores WebRTC signaling data for calls.",
+      "subcollections": {
+        "/signaling/{signalId}": {
+            "schema": { "type": "object" },
+            "description": "WebRTC signaling data (offers, answers, ICE candidates)."
+        }
+      }
+    },
+     "/deliveryRequests/{requestId}": {
+      "schema": {
+        "$ref": "#/entities/DeliveryRequest"
+      },
+      "description": "Stores available delivery requests."
+    },
+     "/deliveryOffers/{offerId}": {
+        "schema": {
+            "$ref": "#/entities/DeliveryOffer"
+        },
+        "description": "Stores delivery offers posted by drivers."
+    },
+    "/immediateRideRequests/{requestId}": {
+        "schema": {
+            "$ref": "#/entities/RideRequest"
+        },
+        "description": "Stores active requests for immediate rides from passengers."
+    },
+    "/scheduledTrips/{tripId}": {
+      "schema": {
+        "$ref": "#/entities/Trip"
+      },
+      "description": "Stores all scheduled trips offered by drivers.",
+      "subcollections": {
+        "/comments/{commentId}": {
+          "schema": { "$ref": "#/entities/Comment" },
+          "description": "Comments for a specific trip."
+        }
+      }
+    },
+    "/trips/{tripId}": {
+      "schema": {},
+       "subcollections": {
+        "/comments/{commentId}": {
+          "schema": { "$ref": "#/entities/Comment" },
+          "description": "Comments for a specific trip."
+        }
+      }
+    },
+    "/hotels/{hotelId}": {
+      "schema": {},
+      "subcollections": {
+        "/comments/{commentId}": {
+          "schema": { "$ref": "#/entities/Comment" },
+          "description": "Comments for a specific hotel."
+        }
+      }
+    },
+    "/restaurants/{restaurantId}": {
+      "schema": {},
+      "subcollections": {
+        "/comments/{commentId}": {
+          "schema": { "$ref": "#/entities/Comment" },
+          "description": "Comments for a specific restaurant."
+        }
+      }
+    },
+    "/ads/{adId}": {
+      "schema": {
+        "$ref": "#/entities/Ad"
+      },
+      "description": "Stores advertisements."
+    },
+    "/bookings/{bookingId}": {
+      "schema": {
+        "$ref": "#/entities/Booking"
+      },
+      "description": "Stores all service bookings."
+    }
+  }
+}
